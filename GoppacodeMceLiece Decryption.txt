@@ -1,0 +1,1500 @@
+#include<iostream>
+#include<string.h>
+#include <algorithm>
+#include<math.h>
+#include<stdlib.h>
+#include<fstream>
+using namespace std;
+#define NN 90
+typedef struct poly
+{
+	int xi[200];
+	int deg;
+}poly;
+typedef struct kzpoly
+{
+	poly xi[NN];//
+	int deg;
+
+}kzpoly;
+//int qx[90], numqx;
+void swap(poly &s1, poly &s2)
+{
+	poly s3 = s1;
+	s1 = s2;
+	s2 = s3;
+}
+void rs(poly &x, int n) //将x左移n位，即将多项式x乘以x^n,比如x^2+1左移两位=x^4+x^2
+{
+
+	for (int i = x.deg; i >= 0; i--)
+	{
+		if (x.xi[i])
+		{
+			x.xi[i] = 0;
+			x.xi[i + n] = 1;
+		}
+	}
+	x.deg += n;
+}
+void init(poly &s1, poly &s2)
+{
+	memset(s1.xi, 0, sizeof(s1.xi));
+	memset(s2.xi, 0, sizeof(s2.xi));
+	cout << "请输入多项式s1(goppa码的生成多项式)的次数" << endl;
+	cin >> s1.deg;
+	cout << "请输入多项式s1的系数" << endl;
+	for (int i = 0; i <= s1.deg; i++)
+		cin >> s1.xi[i];
+	cout << "请输入多项式s2(域的构造多项式）的次数" << endl;//从高到底或者从低到高
+	cin >> s2.deg;
+	cout << "请输入多项式s2的系数" << endl;
+	for (int i = 0; i <= s2.deg; i++)
+		cin >> s2.xi[i];
+}
+int ling(poly x)  //判断x是否为0多项式
+{
+	for (int i = 0; i <= x.deg; i++)
+	{
+		if (x.xi[i])
+			return 1;
+	}
+	return 0;
+}
+poly add(poly x1, poly x2)
+{
+	int flag = 1;
+	int big = x1.deg - x2.deg;
+	int cis;
+	if (big < 0)
+		cis = x2.deg;
+	else
+		cis = x1.deg;
+	for (int i = 0; i <= cis; i++)
+	{
+		x1.xi[i] += x2.xi[i];
+		x1.xi[i] %= 2;
+	}
+	for (int i = cis; i >= 0; i--)
+	{
+		if (x1.xi[i])
+		{
+			x1.deg = i;
+			flag = 0;
+			break;
+		}
+	}
+	if (flag)
+		x1.deg = 0;
+	return x1;
+}
+poly daiyu(poly s1, poly s2, poly &q)//s1次数要大于等于s2，q是s1/s2的商，s4是最后的余数
+{
+	memset(q.xi, 0, sizeof(q.xi));
+	int n = s1.deg - s2.deg;
+	q.deg = n;
+	poly s3, s4 = s1;
+	while (n >= 0)  //不考滤一开始n=0的情况
+	{
+		s3 = s2;
+		q.xi[n] = 1;
+		rs(s3, n);
+		s4 = add(s3, s4);
+		n = s4.deg - s2.deg;
+		if (!n)
+		{
+			if (!ling(s4))
+				return s4;
+		}
+	}
+	return s4;
+}
+int init1(poly &x1, poly &x2, poly &x3, poly &y1, poly &y2, poly &y3, poly &t1, poly &t2, poly s1, poly s2)//扩展欧几里得算法的初始化
+{
+	int flag = 0;
+	if (s1.deg < s2.deg)
+	{
+		swap(s1, s2);
+		flag = 1;
+	}
+	x1.deg = x2.deg = y1.deg = y2.deg = t1.deg = t2.deg = 0;
+	x3 = s1;
+	y3 = s2;
+	memset(x1.xi, 0, sizeof(x1.xi));
+	memset(x2.xi, 0, sizeof(x2.xi));
+	memset(y1.xi, 0, sizeof(y1.xi));
+	memset(y2.xi, 0, sizeof(y2.xi));
+	memset(t1.xi, 0, sizeof(t1.xi));
+	memset(t2.xi, 0, sizeof(t2.xi));
+	x1.xi[0] = y2.xi[0] = 1;
+	return  flag;
+}
+poly mul(poly x1, poly x2)
+{
+	poly x3;
+	memset(x3.xi, 0, sizeof(x3.xi));
+	for (int i = 0; i <= x1.deg; i++)
+	{
+		for (int j = 0; j <= x2.deg; j++)
+		{
+			x3.xi[i + j] += x1.xi[i] * x2.xi[j];
+			x3.xi[i + j] %= 2;
+		}
+	}
+	int flag = 1;
+	for (int i = x1.deg + x2.deg; i >= 0; i--)
+	{
+		if (x3.xi[i])
+		{
+			x3.deg = i;
+			flag = 0;
+			break;
+		}
+	}
+	if (flag)
+		x3.deg = 0;
+	return x3;
+}
+poly mod(poly x1, poly x2)
+{
+	poly q;
+	poly r = daiyu(x1, x2, q);
+	return r;
+}
+void initf(poly field[], int n)//生成域元素，域元素用0，1，x,x^2...表示
+{
+	int num = 1;
+	for (int i = 1; i <= n; i++)
+		num <= 1;
+	for (int i = 0; i < num; i++)
+		memset(field[i].xi, 0, sizeof(field[i].xi));
+	field[1].xi[0] = 1;
+	for (int i = 2; i < num; i++)
+	{
+		field[i].xi[i - 1] = 1;
+	}
+}
+void czer(poly &a)
+{
+	memset(a.xi, 0, sizeof(a));
+	a.deg = 0;
+}
+void gfield(poly a[], poly g, int n, int n1, poly s2)//这个n为2^s2.deg,n1为s2.deg
+{
+	for (int i = 0; i < n; i++)
+		czer(a[i]);
+	a[0].xi[0] = 1;
+	for (int i = 0; i <= g.deg; i++)
+		a[1].xi[0] += g.xi[i];
+	a[1].xi[0] %= 2;//这一步一定为1，不然肯定g一定可约，含有x+1这个因子
+	poly g1;
+	for (int i = 2; i < n; i++)
+	{
+		a[i].xi[0] = g.xi[0];
+		g1 = g;
+		int k, flag = 1;
+		for (int j = g1.deg; j >= 1; j--)
+		{
+			if (g1.xi[j])
+			{
+				k = j * (i - 1);
+				if (flag)
+				{
+					a[i].deg = k;
+					flag = 0;
+				}
+				a[i].xi[k] = 1;
+			}
+
+		}
+		if (a[i].deg >= n1)
+		{
+			a[i] = mod(a[i], s2);
+			if (!ling(a[i]))
+			{
+				cout << "生成多项式在扩域上有根，不满足要求！" << endl;
+				exit(0);
+			}
+		}
+
+	}
+}
+void ginv(poly a[], poly b[], poly s, int n)//拓展欧几里得算法，这个s是域的生成多项式。这个扩展欧几里得算法计算多项式a[i]模域的生成多项式的逆元
+{
+	poly x1, x2, x3, y1, y2, y3, t1, t2, q, t3;
+	int flag;
+	for (int i = 0; i < n; i++)
+	{
+		flag = init1(x1, x2, x3, y1, y2, y3, t1, t2, a[i], s);
+		while (ling(y3))
+		{
+			t3 = daiyu(x3, y3, q);
+			poly ls1 = mul(q, y1);
+			t1 = add(x1, ls1);
+			poly ls2 = mul(q, y2);
+			t2 = add(x2, ls2);
+			x1 = y1; x2 = y2; x3 = y3;
+			y1 = t1; y2 = t2; y3 = t3;
+		}
+		if (flag)
+			b[i] = x2;
+		else
+			b[i] = x1;
+	}
+}
+int count(int n)// 计算域元素的数量
+{
+	int num = 1;
+	for (int i = 0; i < n; i++)
+		num *= 2;
+	return num;
+}
+void gele(poly **H, poly s1, poly *s2, int n1, int n2)//在这里s1是域的生成多项式,s2是逆元多项式数组,n1是goppa码生成多项式的次数，n2=2^(s2.deg)
+{
+	for (int i = 0; i < n2; i++)
+	{
+		H[0][i] = s2[i];
+	}
+	//for (int i = 0; i < 16; i++)
+	//{
+	//	int s = H[0][i].deg;
+	//	//cout << "次数  " << s << "   ";
+	//	for (int j = 0; j <4; j++)
+	//	{
+	//		cout << H[0][i].xi[j];
+	//	}
+	//	cout << endl;
+	//}
+	for (int i = 1; i < n1; i++)
+	{
+		for (int j = 0; j < n2; j++)
+		{
+			if (!j)//如果j=0,H[i][0]=0
+			{
+				czer(H[i][j]);
+			}
+			else
+				if (j == 1)  //如果j=1,注意a1=1
+				{
+					H[i][j] = s2[j];
+				}
+				else
+				{
+
+					poly lins = s2[j];
+					for (int k = lins.deg; k >= 0; k--)
+					{
+						if (lins.xi[k])
+						{
+							lins.xi[k + i * j - i] = 1;//a(j)^i（aj等于x^(j-1)次
+							lins.xi[k] = 0;
+						}
+					}
+					lins.deg += i * j - i;
+					if (lins.deg >= s1.deg)
+					{
+						H[i][j] = mod(lins, s1);//最后对域的生成多项式取mod
+					}
+					else
+						H[i][j] = lins;
+				}
+		}
+	}
+}
+void createH(int **H, poly**res2, int n, int n1, int n2)//n为s2.deg,n1=s1.deg*s2.deg,n2=2^s2.deg
+{
+	for (int i = 0, w = 0; i < n1; w++, i += n)
+	{
+		for (int j = 0; j < n2; j++)
+		{
+			for (int k = 0; k < n; k++)
+			{
+				H[i + k][j] = res2[w][j].xi[k];
+			}
+		}
+	}
+}
+//下面开始进行行最简化
+
+//输出矩阵的函数
+void print(int**H, int M, int N)//以下参数都是用int类型，适应范围更广
+{
+	int i, j;
+	for (i = 0; i < M; i++) //二层循环打印
+	{
+		for (j = 0; j < N; j++)
+		{
+			if (fabs(H[i][j]) < 0.000001) //先判断是否为零
+				H[i][j] = 0;
+			cout << H[i][j] << "   ";
+		}
+		cout << endl;  //一整行打印完，回车，打印下一行
+	}
+}
+//统计矩阵每行从开头起所具有的连续为0的元素的个数并赋给数组count1，例如0 1 2 0 4，则统计出来为1；
+void statistics(int**H, int M, int N, int count1[])
+{
+	int i = 0, j = 0;
+	for (i = 0; i < M; i++) //一层的行循环
+	{
+		int n = 0;
+		for (j = 0; j < M; j++)  //二层列循环
+			if (fabs(H[i][j]) < 0.000001)
+			{
+				n++;
+				count1[i] = n;  //若为零，则计数器加一并赋值给数组count1相应元素
+			}
+			else
+			{
+				count1[i] = n;
+				break;
+			}
+	}
+}
+//交换两行的数据的函数
+void exchange(int a[], int b[], int N)
+{
+	int t;//定义临时变量交换数据
+	/*cout << "a[i]" << endl;
+	for (int i = 0; i < N; i++)
+	{
+		cout << a[i] << " ";
+	}
+	cout << endl;
+	cout << "b[i]" << endl;
+	for (int i = 0; i < N; i++)
+	{
+		cout << b[i] << " ";
+	}
+	cout << endl;*/
+	for (int i = 0; i < N; i++)
+	{
+		t = a[i];
+		a[i] = b[i];
+		b[i] = t;
+	}
+	/*cout << "a[i]" << endl;
+	for (int i = 0; i < N; i++)
+	{
+		cout << a[i] << " ";
+	}
+	cout << endl;
+	cout << "b[i]" << endl;
+	for (int i = 0; i < N; i++)
+	{
+		cout << b[i] << " ";
+	}
+	cout << endl;*/
+}
+//使某个数据变为1
+void change1(int a[], int b, int N)
+{
+	for (int i = 0; i < N; i++)
+		a[i] /= b;
+}
+//判定某列的数据是否为0，并将1或0赋给数组flag[]，如果第i行，第j列的数字为0，则flag[i]=0，否则为1;
+void judgement(int **H, int M, int N, int flag[], int j)//第j列
+{
+	for (int i = 0; i < M; i++)
+		cout << H[i][j] << "   ";
+	cout << endl;
+	for (int i = 0; i < M; i++)
+		if (fabs(H[i][j]) < 0.000001)
+			flag[i] = 0;
+		else
+			flag[i] = 1;
+}
+//b行的数据减去a行的数据与b行该列数据的乘积，将所得的差值再依次赋给b行的数据
+void subtraction(int a[], int b[], int rb, int N)
+{
+	for (int i = 0; i < N; i++)
+	{
+		b[i] = b[i] - a[i] * rb;
+		if (b[i] < 0)
+			b[i] = -b[i];
+		b[i] %= 2;
+	}
+
+}
+void hangzui(int **H, int M, int N)
+{
+
+	int *count1 = new int[M];//用来存储各行从开头起所具有的数据为0 的元素的个数
+	int *flag = new int[M];//flag数组起到标识作用，用来标识某列的数据是否为0，若flag[n]=0,则该列不为0
+	for (int i = 0; i < M; i++)
+	{
+		count1[i] = 0;
+		flag[i] = 0;
+	}
+	cout << "The original matrix:" << endl;
+	print(H, M, N);
+	cout << endl;
+	//核心部分代码
+	for (int j = 0; j < N; j++)
+	{
+		statistics(H, M, N, count1);
+		for (int h = 0; h < M - 1; h++)
+		{
+			int a;
+			for (int k = h + 1; k < M; k++)
+				if (count1[h] > count1[k])
+				{
+					a = count1[h];
+					count1[h] = count1[k];
+					count1[k] = a;
+					exchange(*(H + h), *(H + k), N);
+				}
+			cout << endl;
+		}
+		//行交换后重新统计每行从开头起所连续具有的数据为0的元素的个数并赋给数组count1
+		statistics(H, M, N, count1);
+		//判定第j列的数据是否为0，并将1或0赋给flag数组
+		judgement(H, M, N, flag, j);
+		//如果本行前面的数据均为0即count[k]==j(或者该列为第首列)且本行该列的数据不为0，则将该行进行置1运算
+		for (int k = 0; k < M; k++)
+		{
+			if ((j == 0 || count1[k] == j) && (flag[k] == 1))
+				change1(*(H + k), H[k][j], N);//满足上述条件就将第k行均除以Matrix[k][j]，进行置1运算;
+		}
+
+		//用来label标记使得其他行变为0的辅助基本行的行号,该行前面的元素为0，该列上的元素为1
+		int label = -1;
+		for (int k1 = 0; k1 < M; k1++)
+			//判断条件表示：如果本行前面的数据均为0即count[k]==j(或者该列为第首列)且本行该列的数据不为0
+			if ((j == 0 || count1[k1] == j) && (flag[k1] == 1))
+			{
+				label = k1;
+				break;
+			}
+		if (label != -1)
+		{
+			for (int k2 = 0; k2 < M; k2++)
+				if ((k2 != label) && (flag[k2] == 1))
+					subtraction(H[label], H[k2], H[k2][j], N);
+		}
+	}
+}
+
+//上面开始行最简化
+//将行最简矩阵转化系统形式,如果H[i][i]!=1，即为0，则直接交换第i列和ci列即可，注意ci列只有ci位置一个1，因为H是行最简矩阵
+void changecol(int **H, int M, int N, int k1, int k2)//交换k1列和k2列
+{
+	int t;
+	for (int i = 0; i < M; i++)
+	{
+		t = H[i][k1];
+		H[i][k1] = H[i][k2];
+		H[i][k2] = t;
+	}
+}
+typedef struct doubleele
+{
+	int i, j;
+}dou;
+typedef struct changeele
+{
+	dou exc[50];//记录交换了哪两列
+	int num;//记录列交换了几次
+}cha;
+cha inf;
+void system(int **H, int M, int N)
+{
+	//这里默认为M<N
+	inf.num = 0;
+	inf.exc[0].i = -1;
+	inf.exc[0].j = -1;
+	for (int i = 0; i < M; i++)
+	{
+		if (!H[i][i])
+		{
+			for (int j = 0; j < N; j++)
+			{
+				if (H[i][j])//找到ci的位置，然后交换第i列和ci列
+				{
+					changecol(H, M, N, i, j);
+					inf.exc[inf.num].i = i;
+					inf.exc[inf.num].j = j;
+					inf.num++;
+					break;
+				}
+			}
+		}
+	}
+}
+//将行最简矩阵转化系统形式,如果H[i][i]!=1，即为0，则直接交换第i列和ci列即可，注意ci列只有ci位置一个1，因为H是行最简矩阵
+
+//字节转换成二进制,比如a =97=01100001,bit中保存的是数字0或1而不是'0'或'1'.bit中保存a为 1 0 0 0 0 1 1 0
+int ByteToBit(char ch, char bit[8]) {
+	int cnt;
+	for (cnt = 0; cnt < 8; cnt++) {
+		*(bit + cnt) = (ch >> cnt) & 1;
+	}
+	return 0;
+}
+
+//二进制转换成字节
+char BitToByte(int bit[8], char &ch) {
+	int cnt, sum = 0;
+	for (cnt = 0; cnt < 8; cnt++) {
+		sum += pow(2, cnt)*bit[cnt];
+	}
+	ch = sum;
+	return ch;
+}
+
+//矩阵乘法
+void jzmul(int*a, int*b, int*c, int m, int n, int l)
+{
+	int i, j, k;
+	int temp = 0;
+	int*b1;
+	b1 = new int[l*n];
+	memset(b1, 0, sizeof(int)*l*n);
+	int num = 0;
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < l; j++)
+			b1[num++] = b[j*n + i];
+	//for (int i = 0; i < l*n; i++)
+	//	cout << b1[i] << "  ";
+	for (i = 0; i < m; i++)
+	{
+		for (j = 0; j < n; j++)
+		{
+			temp = 0;
+			for (int k = 0; k < l; k++)
+			{
+				temp += a[i*l + k] * b1[j*l + k];
+			}
+			c[i*n + j] = temp;
+		}
+	}
+	delete[] b1;
+}
+//生成H矩阵
+void geneH(poly s1, poly s2, int **H, int num)
+{
+	poly* res1 = new poly[num];
+	for (int i = 0; i < num; i++)
+		czer(res1[i]);
+	gfield(res1, s1, num, s2.deg, s2);//计算g(0),g(1),g(a),g(a^2)....,结果保存在res1中
+	/*for (int i = 0; i < num; i++)
+	{
+		int s = res1[i].deg;
+		cout << "次数  " << s << "  ";
+		for (int j = 0; j <= s; j++)
+			cout << res1[i].xi[j] << "  ";
+		cout << endl;
+	}*/
+	poly* res2 = new poly[num];
+	for (int i = 0; i < num; i++)
+		czer(res2[i]);
+	ginv(res1, res2, s2, num);//计算g(0),g(1),g(a),g(a^2)的逆....,结果保存在res2中
+	for (int i = 0; i < num; i++)
+	{
+		cout << "次数" << res2[i].deg << "    " << " 值：";
+		for (int j = 0; j <= res2[i].deg; j++)
+		{
+			cout << res2[i].xi[j];
+		}
+		cout << endl;
+	}
+	poly **H1 = new poly*[s1.deg];//用来保存H矩阵的多项式形式
+	for (int i = 0; i < s1.deg; i++)
+	{
+		H1[i] = new poly[num];
+	}
+	for (int i = 0; i < s1.deg; i++)
+	{
+		for (int j = 0; j < num; j++)
+			czer(H1[i][j]);
+	}
+	gele(H1, s2, res2, s1.deg, num);//成校验矩阵的多项式形式
+	createH(H, H1, s2.deg, s1.deg*s2.deg, num);//生成校验矩阵的比特串形式
+	hangzui(H, s1.deg*s2.deg, num);
+	cout << "dsfv" << endl;
+	for (int i = 0; i < s1.deg*s2.deg; i++)
+	{
+		for (int j = 0; j < num; j++)
+			cout << H[i][j] << " ";
+		cout << endl;
+	}
+	cout << "dfv" << endl;
+	system(H, s1.deg*s2.deg, num);//系统化后的矩阵不就是交换域元素后生成的goppa code的校验矩阵吗？，所以不需要再求一次校验矩阵
+	for (int i = 0; i < s1.deg*s2.deg; i++)
+	{
+		for (int j = 0; j < num; j++)
+			cout << H[i][j] << " ";
+		cout << endl;
+	}
+	if (inf.num)
+	{
+		cout << "交换了哪两列" << endl;
+		for (int i = 0; i < inf.num; i++)
+		{
+			cout << inf.exc[i].i << " " << inf.exc[i].j << endl;
+		}
+	}
+	else
+		cout << "没有进行列交换，原校验矩阵即为系统形式" << endl;
+	//H矩阵是（n-k)*n(n是2^s2.deg)
+	//先将H矩阵化为一维的形式
+}
+//计算密文
+void coum(poly s1, poly s2, int **H, int num)
+{
+	//H2矩阵是H矩阵的一维形式
+	int *H2 = new int[s1.deg*s2.deg*num];
+	for (int i = 0; i < s1.deg*s2.deg*num; i++)
+	{
+		H2[i] = 0;//将H2初始化
+	}
+	//将H矩阵保存到H2矩阵中
+	for (int i = 0; i < s1.deg*s2.deg; i++)
+	{
+		for (int j = 0; j < num; j++)
+		{
+			H2[i*num + j] = H[i][j];
+			cout << H[i][j] << " ";
+			//cout << i * num + j << "   ";
+		}
+		cout << endl;
+	}
+	/*for (int i = 0; i < s1.deg*s2.deg*num; i++)
+	{
+		cout << H2[i] << ",";
+	}*/
+	ifstream ifile("C:\\Users\\ASUS\\Desktop\\加解密测试\\test.txt");
+	if (!ifile)
+	{
+		cout << "C:\\Users\\ASUS\\Desktop\\加解密测试\\test.txt can not be openned" << endl;
+	}
+	ofstream ofile("C:\\Users\\ASUS\\Desktop\\加解密测试\\密文.txt");
+	if (!ofile)
+	{
+		cout << "C:\\Users\\ASUS\\Desktop\\加解密测试\\密文.txt can not be openned" << endl;
+	}
+	char ch;
+	char bit[8] = { '0' };
+	//因为H的列为num行，所以需要将消息变成num位，bit1来保存这num位
+	char *bit1 = new char[num];
+	memset(bit1, 0, sizeof(char)*num);
+	while (ifile.get(ch))
+	{
+		if (ch >= 'a'&&ch <= 'z')//只处理小写英文字幕，别的暂时不处理
+		{
+
+			if (s1.deg <= 8)  //因为一个英文字符占8Bit，所以当纠错能力小于8，需要将一个英文字符分几次处理，比如s1.deg=2，则分四次处理，每次取出来2位，然后填充num-2位
+			{
+				ByteToBit(ch, bit);//将ch 转换成比特串形式
+				for (int i = 0; i < 8; i += s1.deg) //因为纠错能力为s1.deg，所以每次取出这么多
+				{
+					for (int j = i; j < i + s1.deg; j++)//让j=i，这样bit1每次的前s1.deg位保存需要纠错的字符
+					{
+						bit1[j - i] = bit[j];
+					}
+					//bit1[num]保存将要加密的消息，共num位
+					//计算H*bit1，结果是n-k维向量，进行填充让它长度为8的倍数，解密的时候去除掉填充的0即可，k是goppa码生成多项式的次数，只需填充k位即可
+					//这个地方result，分配空间为num，而不是num-s1.deg，因为后面要进行填充0，所以就直接申请num个空间
+					int *bit2 = new int[num];
+					memset(bit2, 0, sizeof(int)*num);
+					for (int i = 0; i < num; i++)
+					{
+						bit2[i] = bit1[i];
+						cout << bit2[i] << " ";
+					}
+					cout << endl;
+					int *result = new int[num];
+					memset(result, 0, sizeof(int)*num);
+					jzmul(H2, bit2, result, s1.deg*s2.deg, 1, num);//这个result是一个8，16，32...长的一维数组
+					for (int i = 0; i < num; i++)
+						ofile.put(result[i] + '0');
+					ofile.put(' ');
+				}
+			}
+			else
+			{
+				//后面再写这种形式
+			}
+
+		}
+	}
+	ifile.close();
+	ofile.close();
+
+}
+////////////////////////////////////////////将全局变量写到一块
+kzpoly g1;
+poly g2;//g1 goppa码的生成多项式，g2域的生成多项式
+int num = 1;
+poly tabfield[1025];//s3域的元素转换数组;
+//////////////////////////
+void kczer(kzpoly &x, int n)
+{
+	for (int i = 0; i < n; i++)
+		czer(x.xi[i]);
+	x.deg = 0;
+}
+void fieldtab(poly *s2)//s1域的生成多项式，num=2^域的生成多项式的次数。该函数（域表）生成0,1,x，x^2...x^14在mod x^3+x^2+1下的值
+{
+	poly q;
+	czer(q);
+	czer(s2[0]);
+	czer(s2[1]);
+	s2[1].xi[0] = 1;
+	for (int i = 2; i < num; i++)
+	{
+		poly lins;
+		czer(lins);
+		lins.deg = i - 1;
+		lins.xi[i - 1] = 1;
+		if (lins.deg >= g2.deg)
+		{
+			lins = daiyu(lins, g2, q);
+		}
+		s2[i] = lins;
+	}
+}
+//每次定义一个多项式或者扩域的多项式都要先初始化
+int  find(poly x)//num为2^s2.deg,这个x一定要对域的生成多项式取模,y是域的生成多项式 。find函数用来找x在域表中的位置。
+{
+	if (x.deg >= g2.deg)
+		x = mod(x, g2);
+	for (int i = 0; i < num; i++)
+	{
+		int count = 0;
+		if (x.deg == tabfield[i].deg)
+		{
+			for (int j = 0; j <= x.deg; j++)
+			{
+				if (x.xi[j] != tabfield[i].xi[j])
+				{
+					break;
+				}
+				else
+					count++;
+			}
+			if (count == x.deg + 1)
+			{
+				return i;
+			}
+		}
+	}
+}
+void change(kzpoly &x)//y为域生,num为2^s2.deg.change函数用来找将x转化为一个系数的形式，比如（a1+a2)*x^3转化为ak*x^3
+{
+	int n;
+	for (int i = 0; i <= x.deg; i++)
+	{
+		n = find(x.xi[i]);
+		if (!n)
+		{
+			czer(x.xi[i]);
+		}
+		else
+			/*if (n == 1)
+			{
+				czer(x.xi[i]);
+				x.xi[i].deg = 0;
+				x.xi[i].xi[n-1] = 1;
+			}
+			else*/   //逻辑一样的，不用分情况
+		{
+			czer(x.xi[i]);
+			x.xi[i].deg = n - 1;
+			x.xi[i].xi[n - 1] = 1;
+		}
+
+	}
+}
+kzpoly kadd(kzpoly x1, kzpoly x2)//g为域生
+{
+	int flag = 1;
+	int big = x1.deg - x2.deg;
+	int cis;
+	if (big < 0)
+		cis = x2.deg;
+	else
+		cis = x1.deg;
+	for (int i = 0; i <= cis; i++)
+	{
+		x1.xi[i] = add(x1.xi[i], x2.xi[i]);
+		//要不要考虑mod完x1.xi[i]为0的情况？
+	}
+	for (int i = cis; i >= 0; i--)
+	{
+		if (ling(x1.xi[i]))
+		{
+			x1.deg = i;
+			flag = 0;
+			break;
+		}
+	}
+	if (flag)
+		x1.deg = 0;
+	change(x1);//这个地方x1的次数还未更新，调用changge函数就会出错
+	return x1;
+}
+kzpoly kmul(kzpoly x1, kzpoly x2)//s为域的生成多项式  //这个乘法没有考虑a^6=1
+{
+	kzpoly x3;
+	kczer(x3, NN);
+	for (int i = 0; i <= x1.deg; i++)
+	{
+		for (int j = 0; j <= x2.deg; j++)
+		{
+			x3.xi[i + j] = add(x3.xi[i + j], mul(x1.xi[i], x2.xi[j]));
+		}
+	}
+	int flag = 1;
+	for (int i = x1.deg + x2.deg; i >= 0; i--)
+	{
+		if (ling(x3.xi[i]))
+		{
+			x3.deg = i;
+			flag = 0;
+			break;
+		}
+	}
+	if (flag)
+		x3.deg = 0;
+	return x3;
+}
+int kling(kzpoly x)
+{
+	for (int i = 0; i <= x.deg; i++)
+	{
+		for (int j = 0; j <= x.xi[i].deg; j++)
+		{
+			if (x.xi[i].xi[j])
+				return 1;
+		}
+	}
+	return 0;
+}
+void kswap(kzpoly &s1, kzpoly &s2)
+{
+	kzpoly s3;
+	kczer(s3, NN);
+	s3 = s1;
+	s1 = s2;
+	s2 = s3;
+}
+kzpoly kdaiyu(kzpoly s1, kzpoly s2, kzpoly &q)//s1次数要大于等于s2,s为域的生成多项式,num=2^(s2.deg)-1
+{
+	kczer(q, NN);
+	int n = s1.deg - s2.deg;
+	if (n < 0)
+	{
+		kswap(s1, s2);
+		n = -n;
+	}
+	int n1 = s1.xi[s1.deg].deg - s2.xi[s2.deg].deg;
+	if (n1 < 0)
+		n1 += num - 1;
+	q.deg = n;
+	q.xi[n].deg = n1;
+	kzpoly s3, s4 = s1;
+	kzpoly lins;
+	kczer(lins, NN);
+	kczer(s3, NN);
+	lins.deg = n;
+	lins.xi[n].xi[n1] = 1;
+	while (n >= 0)  //不考滤一开始n=0的情况
+	{
+		s3 = s2;
+		lins.deg = n;
+		lins.xi[n].xi[n1] = 1;
+		lins.xi[n].deg = n1;
+		q.xi[n].deg = n1;
+		q.xi[n].xi[n1] = 1;
+		//rs(s3, n);
+		/*for (int i = 0; i <= lins.deg; i++)
+		{
+			cout << "x^的" << i << "次的系数为: ";
+			for (int j = 0; j <= lins.xi[i].deg; j++)
+			{
+				cout << lins.xi[i].xi[j] << "  ";
+			}
+			cout << endl;
+		}*/
+		s3 = kmul(s3, lins);
+		change(s3);
+		/*for (int i = 0; i <= s3.deg; i++)
+		{
+			cout << "x^的" << i << "次的系数为: ";
+			for (int j = 0; j <= s3.xi[i].deg; j++)
+			{
+				cout << s3.xi[i].xi[j] << "  ";
+			}
+			cout << endl;
+		}*/
+		s4 = kadd(s3, s4);
+		/*for (int i = 0; i <= s4.deg; i++)
+		{
+			cout << "x^的" << i << "次的系数为: ";
+			for (int j = 0; j <= s4.xi[i].deg; j++)
+			{
+				cout << s4.xi[i].xi[j] << "  ";
+			}
+			cout << endl;
+		}*/
+		//change(s4);
+		/*for (int i = 0; i <= s4.deg; i++)
+		{
+			cout << "x^的" << i << "次的系数为: ";
+			for (int j = 0; j <= s4.xi[i].deg; j++)
+			{
+				cout << s4.xi[i].xi[j] << "  ";
+			}
+			cout << endl;
+		}*/
+		n = s4.deg - s2.deg;
+		n1 = s4.xi[s4.deg].deg - s2.xi[s2.deg].deg;
+		if (n1 < 0)
+			n1 += num - 1;
+		if (!n)
+		{
+			if (!kling(s4))
+				return s4;
+		}
+		if (!n)
+		{
+			if (!s2.deg)//比如说s2等于a^3，此时n=0,感觉这两个!n可以合并的，可以合并成下面的那个；因为当s4为0，s2次数为0时，如果s4要么等于0 1 a,a^2....直接返回s4即可
+				return s4;
+		}
+	}
+	return s4;
+}
+int kzinit1(kzpoly &x1, kzpoly &x2, kzpoly &x3, kzpoly &y1, kzpoly &y2, kzpoly &y3, kzpoly &t1, kzpoly &t2, kzpoly s1, kzpoly s2)
+{
+	int flag = 0;
+	if (s1.deg < s2.deg)
+	{
+		kswap(s1, s2);
+		flag = 1;
+	}
+	x3 = s1;
+	y3 = s2;
+	kczer(x1, NN);
+	kczer(x2, NN);
+	kczer(y1, NN);
+	kczer(y2, NN);
+	kczer(t1, NN);
+	kczer(t2, NN);
+	x1.xi[0].xi[0] = 1;
+	y2.xi[0].xi[0] = 1;
+	return  flag;
+}
+kzpoly kzginv(kzpoly s1, kzpoly s2)//拓展欧几里得算法，这个s是域的生成多项式
+{
+	kzpoly x1, x2, x3, y1, y2, y3, t1, t2, q, t3;
+
+	int flag;
+	flag = kzinit1(x1, x2, x3, y1, y2, y3, t1, t2, s1, s2);
+	t3.deg = 1;//如果没有这一步，进不去while循环,必须使得t3.deg！=1
+	while (t3.deg)
+	{
+		t3 = kdaiyu(x3, y3, q);
+		kzpoly ls1 = kmul(q, y1);
+		t1 = kadd(x1, ls1);
+		kzpoly ls2 = kmul(q, y2);
+		t2 = kadd(x2, ls2);
+		x1 = y1; x2 = y2; x3 = y3;
+		y1 = t1; y2 = t2; y3 = t3;
+	}
+	kzpoly result;
+	kczer(result, NN);
+	x1 = y1; x2 = y2;
+	kzpoly result1;
+	kczer(result1, NN);
+	result1.xi[0].deg = num - 1 - t3.xi[0].deg;
+	result1.xi[0].xi[result1.xi[0].deg] = 1;
+	if (flag)
+	{
+		result = kmul(x2, result1);
+	}
+	else
+	{
+		result = kmul(x1, result1);
+	}
+	change(result);
+	return result;
+}
+kzpoly kzginv1(kzpoly s1, kzpoly s2)//对校验多项式和生成多项式进行辗转相除求错误多项式 输入：s1：校验多项式 s2:Goppa code的生成多项式   输出： s1对s2的逆元
+{
+	kzpoly x1, x2, x3, y1, y2, y3, t1, t2, q, t3;
+
+	int flag;
+	flag = kzinit1(x1, x2, x3, y1, y2, y3, t1, t2, s1, s2);
+	t3.deg = 1000;//如果没有这一步，进不去while循环,必须使得t3.deg！=1
+	while (t3.deg >= g1.deg / 2)
+	{
+		t3 = kdaiyu(x3, y3, q);
+		kzpoly ls1 = kmul(q, y1);
+		t1 = kadd(x1, ls1);
+		kzpoly ls2 = kmul(q, y2);
+		t2 = kadd(x2, ls2);
+		x1 = y1; x2 = y2; x3 = y3;
+		y1 = t1; y2 = t2; y3 = t3;
+	}
+	kzpoly result;
+	kczer(result, NN);
+	x1 = y1; x2 = y2;
+	if (flag)
+	{
+		result = x2;
+	}
+	else
+	{
+		result = x1;
+	}
+	change(result);
+	return result;
+}
+void kzginv2(kzpoly s1, kzpoly s2, kzpoly &r, kzpoly &v)//对校验多项式和生成多项式进行辗转相除求错误多项式
+{
+	kzpoly x1, x2, x3, y1, y2, y3, t1, t2, q, t3;
+
+	int flag;
+	flag = kzinit1(x1, x2, x3, y1, y2, y3, t1, t2, s1, s2);
+	//t3.deg = 1000;//如果没有这一步，进不去while循环,必须使得t3.deg！=1
+	t3 = y3;
+	while (t3.deg > g1.deg / 2)//当循环停止的时候，t3也就是r，r.deg<=g1.deg，在此之前的r都是r.deg>g1.deg。所以循环终止的t3就是我们要找的r
+	{
+		t3 = kdaiyu(x3, y3, q);
+		kzpoly ls1 = kmul(q, y1);
+		t1 = kadd(x1, ls1);
+		kzpoly ls2 = kmul(q, y2);
+		t2 = kadd(x2, ls2);
+		x1 = y1; x2 = y2; x3 = y3;
+		y1 = t1; y2 = t2; y3 = t3;//y3是余数多项式,y2应该是俄文译码算法中的v
+	}
+	change(t3);
+	change(y2);
+	r = t3;
+	v = y2;
+}
+#define M 8
+typedef struct
+{
+	int n;  //有几个非0量
+	int r[M];//存储非0量的位置
+}Re;
+void root(kzpoly s, int n, int a[])//n代表域的元素个数,a保存错误位置，错误位置从0开始编号  root函数用来求错误多项式的根，找出错误位置
+{
+	int num = 0;
+	for (int i = 0; i < n; i++)
+	{
+		poly s1;
+		czer(s1);
+
+		for (int j = 0; j <= s.deg; j++)
+		{
+			poly s2, s3, s4;
+			czer(s2);
+			czer(s3);
+			czer(s4);
+			s2.deg = s.xi[j].deg;
+			if (!s2.deg && !s.xi[j].xi[0])//注意s的常数项为0的情况
+				;
+			else
+				s2.xi[s2.deg] = 1;
+			if (!j)
+				s1 = add(s1, s2);//j=0，计算常数项
+			if (!i)
+			{
+				break;
+			}
+			if (j)
+			{
+				s3.deg = j * (i - 1);
+				s3.xi[s3.deg] = 1;
+				s1 = add(s1, mul(s2, s3));
+			}
+		}
+		s1 = mod(s1, g2);
+		if (!ling(s1))
+		{
+			a[num] = i;
+			num++;
+			if (num == s.deg)
+				return;
+		}
+	}
+}
+void initg(kzpoly &g1, poly &g2)//将开始的poly 类型的goppa code的生成多项式和域的构造多项式转化为kzpoly形式
+{
+	cout << "请输入goppa码生成多项式的次数" << endl;
+	cin >> g1.deg;
+	cout << "请输入请输入goppa码生成多项式的系数" << endl;
+	for (int i = 0; i <= g1.deg; i++)
+	{
+		cout << "请输入这一位的扩域的次数" << endl;
+		cin >> g1.xi[i].deg;
+		cout << "请输入扩域的系数" << endl;
+		for (int j = 0; j <= g1.xi[i].deg; j++)
+		{
+			cin >> g1.xi[i].xi[j];
+		}
+	}
+	cout << "请输入域生成多项式的次数" << endl;
+	cin >> g2.deg;
+	cout << "请输入域生成多项式的系数" << endl;
+	for (int i = 0; i <= g2.deg; i++)
+		cin >> g2.xi[i];
+	for (int i = 0; i < g2.deg; i++)
+		num *= 2;
+	fieldtab(tabfield);
+}
+//求校正子
+void qiuj(kzpoly &r1, kzpoly* sx, Re re)  //输入：r1，没有什么作用  sx用来记录x+a^n次方，如果接收字符串的第三位为，则n=1,第四位为1，则n=2。 re保存接收字符串为1的位置 输出：校正子r1
+{
+	for (int i = 0; i < re.n; i++)
+	{
+		kczer(sx[i], NN);
+		sx[i].deg = 1;
+		sx[i].xi[1].deg = 0;
+		sx[i].xi[1].xi[0] = 1;
+		/*if (re.r[i] == 1)
+		{
+			sx[i].xi[0].xi[0] = 1;
+		}
+		else
+		{
+			sx[i].xi[0].deg = i - 1;
+			sx[i].xi[0].xi[i - 1] = 1;
+		}*/
+		if (re.r[i])
+		{
+			int k = re.r[i] - 1;
+			sx[i].xi[0].deg = k;
+			sx[i].xi[0].xi[k] = 1;
+		}
+		kzpoly zj;
+		kczer(zj, NN);
+		zj = kzginv(sx[i], g1);
+
+		r1 = kadd(r1, zj);//r1为校正字
+	}
+	cout << "校正子：" << endl;
+}
+int juequal(int *a, int *b)
+{
+	for (int i = 0; i < num; i++)
+	{
+		if (a[i] != b[i])
+			return 0;
+	}
+	return 1;
+}
+void kprint(kzpoly r1)
+{
+	for (int i = 0; i <= r1.deg; i++)
+	{
+		cout << "x^的" << i << "次的系数为: ";
+		for (int j = 0; j <= r1.xi[i].deg; j++)
+		{
+			cout << r1.xi[i].xi[j] << "  ";
+		}
+		cout << endl;
+	}
+}
+int judgew(int *H)
+{
+	int num1 = 0;
+	for (int i = 0; i < num; i++)
+	{
+		if (H[i])
+			num1++;
+	}
+	return num1;
+}
+void jou(kzpoly t, int num, kzpoly &w1, kzpoly &w2) //将t(x)拆分成奇数项和偶数项之和,num是域中元素数量-1
+{
+	kzpoly t1, t2;
+	kczer(t1, NN);
+	kczer(t2, NN);
+	for (int i = t.deg; i >= 0; i--)
+	{
+		if (i % 2)//奇数项
+		{
+			if (ling(t.xi[i]))
+			{
+				int m = (i - 1) / 2;
+				t2.deg = max(m, t2.deg);
+				if (t.xi[i].deg % 2)
+				{
+					t2.xi[m].deg = (t.xi[i].deg + num) / 2;
+					t2.xi[m].xi[t2.xi[m].deg] = 1;
+				}
+				else
+				{
+					t2.xi[m].deg = (t.xi[i].deg) / 2;
+					t2.xi[m].xi[t2.xi[m].deg] = 1;
+				}
+			}
+		}
+		else  //偶数项
+		{
+			if (ling(t.xi[i]))//考虑t的偶数项为0的情况，比如x^3+x+1.x^2的系数为0。如果为0，则t2的对应项的次数和系数都为0，但是前面已经初始化ti的各项都为0了
+			{
+				int m = i / 2;
+				t1.deg = max(m, t1.deg);
+				if (t.xi[i].deg % 2)//比如a^3*x^2,此时应该为a^5*x
+				{
+					t1.xi[m].deg = (t.xi[i].deg + num) / 2;
+					t1.xi[m].xi[t1.xi[m].deg] = 1;
+				}
+				else
+				{
+					t1.xi[m].deg = (t.xi[i].deg) / 2;
+					t1.xi[m].xi[t1.xi[m].deg] = 1;
+				}
+			}
+		}
+	}
+	w1 = t1;
+	w2 = t2;
+}
+kzpoly pfg(kzpoly g, kzpoly t, int num) //模g(x)=t(x)的平方根算法,num是域中元素数量-1, 输出：y（平方根）
+{
+	kzpoly t1, t2, g1, g2;
+	kczer(t1, NN);
+	kczer(t1, NN);
+	kczer(g1, NN);
+	kczer(g2, NN);
+	jou(t, num, t1, t2);
+	jou(g, num, g1, g2);
+	kzpoly g2_ = kzginv(g2, g);//求g2对g的逆元
+	kzpoly w = kmul(g2_, g1);
+	if (w.deg >= g.deg)
+	{
+		kzpoly q;
+		w = kdaiyu(w, g, q);
+	}
+	kzpoly y = kmul(w, t2);
+	y = kadd(y, t1);
+	if (y.deg >= g.deg)
+	{
+		kzpoly q;
+		y = kdaiyu(y, g, q);
+	}
+	return y;
+}
+kzpoly cuowu(kzpoly g1, kzpoly y) //输入：g1是goppa code的生成多项式， y是模g1=t(x)的平方根  输出：错误多项式a
+{
+	kzpoly r, v, a, zj, x;
+	kzginv2(g1, y, r, v);
+	zj = kmul(v, v);
+	x.deg = 1;
+	x.xi[0].deg = 0;
+	x.xi[0].xi[0] = 0;
+	x.xi[1].deg = 0;
+	x.xi[1].xi[0] = 1;
+	a = kadd(kmul(r, r), kmul(x, zj));
+	//change(a);
+	cout << "错误多项式为：" << endl;
+	for (int i = 0; i <= a.deg; i++)
+	{
+
+		for (int j = 0; j <= a.xi[i].deg; j++)
+			cout << a.xi[i].xi[j] << "  ";
+		cout << endl;
+	}
+	return a;
+}
+int zres[8];
+int yyy = 0;
+int rootj[100];
+void jiem()
+{
+	Re re;
+	re.n = 0;
+	/*for (int i = 0; i < num; i++)
+	{
+		for(int j=0;j<=tabfield[i].deg;j++)
+		  cout << tabfield[i].xi[j] << "  ";
+		cout << endl;
+
+	}*/
+	ifstream ifile("C:\\Users\\ASUS\\Desktop\\加解密测试\\密文.txt");
+	if (!ifile)
+	{
+		cout << "C:\\Users\\ASUS\\Desktop\\加解密测试\\密文.txt can not be openned" << endl;
+	}
+	ofstream ofile("C:\\Users\\ASUS\\Desktop\\加解密测试\\解密明文.txt");
+	if (!ofile)
+	{
+		cout << "C:\\Users\\ASUS\\Desktop\\加解密测试\\解密明文.txt can not be openned" << endl;
+	}
+	char ch;
+	int *receive = new int[num];
+	memset(receive, 0, sizeof(int)*num);
+	int idex = 0;
+	while (ifile.get(ch)) //
+	{
+		if (ch != ' ')//读取到空格，将idex置0，开始读入下一个
+		{
+			if (ch == '1')  //保存接收的密文比特串中1的位置
+			{
+				re.r[re.n++] = idex;
+			}
+			receive[idex++] = ch - '0';//现在receive读取一个完整的8bit
+			int *rec=new int[g1.deg*g2.deg];//因为密文的有效位为g1.deg*g2.deg，别的位数为填充的0
+			for (int i = 0; i < 6; i++)
+			{
+				rec[i] = receive[i];
+			}
+			//开始计算满足Hx=rec的x，需要调用那个行最简的程序
+
+		}
+		else
+		{
+			//每读完一个开始进行解密运算
+			//保存加密的结果，以便暴力破解
+			int *receive1 = new int[num];
+			for (int i = 0; i < num; i++)
+				receive1[i] = receive[i];
+			if (re.n)//如果全0，则没有必要计算了
+			{
+				kzpoly q, r1;
+				kczer(q, NN);
+				kczer(r1, NN);
+				kzpoly *sx = new kzpoly[re.n];
+				//求校正子
+				qiuj(r1, sx, re);
+				kprint(r1);
+				//计算（校正子的逆元+x）的平方根
+				kzpoly ny = kzginv1(r1, g1);
+				kzpoly x;
+				x.deg = 1;
+				x.xi[0].deg = 0;
+				x.xi[0].xi[0] = 0;
+				x.xi[1].deg = 0;
+				x.xi[1].xi[0] = 1;
+				kzpoly pf = pfg(g1, kadd(x,ny),num);
+				//求出平方根后开始求错误多项式
+				q = cuowu(g1, pf);
+				cout << "错误多项式" << endl;
+				kprint(q);
+				//求出错误多项式开始求根
+				//确定错误方程的根
+				cout << "错误位置" << endl;
+				root(q, num, rootj);
+				for (int i = 0; i < q.deg; i++)
+				{
+					cout << rootj[i] << "   ";
+				}
+				cout << endl;
+				for (int i = 0; i < q.deg; i++)
+				{
+					if (receive[rootj[i]])
+						receive[rootj[i]] = 0;
+					else
+						receive[rootj[i]] = 1;
+				}
+			}
+			int H[48] = { 1,0,0,0,0,0,1,1,0,1,0,0,0,0,1,1,0,0,1,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1 };
+			int *xx = new int[num];
+			memset(xx, 0, sizeof(int)*num);
+			int *mei = new int[num];
+			memset(mei, 0, sizeof(int)*num);
+			jzmul(H, receive, xx, 6, 1, 8);
+			if (juequal(xx, receive1) && judgew(receive) <= g1.deg / 2)
+			{
+				cout << "译码求解成功" << endl;
+				for (int i = 0; i < g1.deg / 2; i++)
+				{
+					zres[yyy++] = receive[i];
+					if (yyy == 8)
+					{
+						int sum = 0;
+						for (int k = 0; k < 8; k++)
+						{
+							sum += zres[k] * pow(2, k);
+						}
+						char ch = sum;
+						cout << "字母为" << ch << endl;
+						ofile.put(ch);
+						yyy = 0;
+					}
+				}
+			}
+			else
+			{
+
+				cout << "译码求解失败，进行暴力求解" << endl;
+				int flag = 1;
+				//qiongju(mei, 0, num, 0, H, xx, receive1, ofile, flag);
+			}
+			//ofile.put(' ');
+			//注意最后将idex和re.n重新置0
+			idex = 0;
+			re.n = 0;
+		}
+
+	}
+	ifile.close();
+	ofile.close();
+}
+int main()
+
+{
+	poly s1, s2;//s1是goppa码的生成多项式，s2为构造域的多项式;
+	poly field[256];//构造的域
+	init(s1, s2);//输入poly类型的s1,s2
+	//initf(field,s2.deg);//构造域（后面会用到）
+	int num = 1;//num即域元素的数量
+	num = count(s2.deg);
+	int **H = new int*[s1.deg*s2.deg];
+	//将H看作参数传递
+	//int **H = new int*[s1.deg*s2.deg];//生成二维动态数组，H用来保存生成矩阵的比特串形式。
+	for (int i = 0; i < s1.deg*s2.deg; i++)
+	{
+		H[i] = new int[num];
+	}
+	for (int i = 0; i < s1.deg*s2.deg; i++)
+		for (int j = 0; j < num; j++)
+			H[i][j] = 0;
+	geneH(s1, s2, H, num);
+	cout << "生成goppa code 的系统矩阵" << endl;
+	initg(g1, g2);
+	cout << "开始进行加密" << endl;
+	coum(s1, s2, H, num);
+	cout << "加密完成" << endl;
+	//下面开始解密：
+	//cout << "开始进行解密" << endl;
+	//jiem();
+	kzpoly t, g;
+	kczer(t, NN);
+	kczer(g, NN);
+	/*cin >> g.deg;
+	for (int i = 0; i <= g.deg; i++)
+	{
+		cin >> g.xi[i].deg;
+		for (int j = 0; j <= g.xi[i].deg; j++)
+			cin >> g.xi[i].xi[j];
+	}*/
+	//这一段代码是用来测试平方根函数的正确性的
+	/*cin >> t.deg;
+	for (int i = 0; i <= t.deg; i++)
+	{
+		cin >> t.xi[i].deg;
+		for (int j = 0; j <= t.xi[i].deg; j++)
+			cin >> t.xi[i].xi[j];
+	}
+	kzpoly y = pfg(g1, t, num-1);
+	cout << "平方根为：" << endl;*/
+	//测试错误多项式的
+	/*for (int i = 0; i <= y.deg; i++)
+	{
+
+		for (int j = 0; j <= y.xi[i].deg; j++)
+			cout<< y.xi[i].xi[j]<<"  ";
+		cout << endl;
+	}
+	kzpoly k = cuowu(g1, y);*/
+
+
+	return 0;
+}
